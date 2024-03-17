@@ -3,8 +3,10 @@
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/profanity-filter.svg)
 [![PyPI](https://img.shields.io/pypi/v/profanity-filter.svg)](https://pypi.org/project/profanity-filter/)
 
-## Archived
-This library is no longer a priority for me. Feel free to fork it.
+# Changes
+- Updated outdated packages
+- Fixed dependecies
+- Bumped python version up-to 3.11
 
 ## Table of contents
 <!--ts-->
