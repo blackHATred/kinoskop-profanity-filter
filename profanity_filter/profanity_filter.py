@@ -2,12 +2,10 @@ import re
 from collections import defaultdict
 from contextlib import suppress, contextmanager
 from copy import deepcopy
-from itertools import chain
 from math import floor
 from pathlib import Path
 from typing import Dict, Union, List, Tuple, Set, Collection, ContextManager, Optional
 
-import poetry_version
 import spacy
 import spacy.attrs
 import spacy.language
@@ -15,14 +13,13 @@ import spacy.tokens
 from cached_property import cached_property
 from more_itertools import substrings_indexes
 from ordered_set import OrderedSet
-from redis import Redis
 
 from profanity_filter import spacy_utlis
 from profanity_filter.config import Config, DEFAULT_CONFIG
 from profanity_filter.spacy_component import SpacyProfanityFilterComponent
 from profanity_filter.types_ import (Words, Language, ProfaneWordDictionaries, ProfaneWordDictionariesAcceptable,
                                      Languages, LanguagesAcceptable, Nlps, Morphs, Spells, Substrings,
-                                     TextSplittedByLanguage, ProfanityFilterError, Word, AnalysisType, AnalysesTypes)
+                                     TextSplitByLanguage, ProfanityFilterError, Word, AnalysisType, AnalysesTypes)
 
 
 class DummyHunSpell:
@@ -65,10 +62,6 @@ MorphAnalyzer = DummyMorphAnalyzer
 _available_analyses_list = []
 
 with suppress(ImportError):
-    from profanity_filter.analysis.deep import *
-    _available_analyses_list.append(AnalysisType.DEEP)
-
-with suppress(ImportError):
     from profanity_filter.analysis.morphological import *
     _available_analyses_list.append(AnalysisType.MORPHOLOGICAL)
 
@@ -80,7 +73,6 @@ AVAILABLE_ANALYSES: AnalysesTypes = frozenset(_available_analyses_list)
 
 
 APP_NAME = 'profanity-filter'
-__version__ = poetry_version.extract(source_file=__file__)
 
 
 class ProfanityFilter:
@@ -88,7 +80,6 @@ class ProfanityFilter:
                  languages: LanguagesAcceptable = tuple(DEFAULT_CONFIG.languages),
                  *,
                  analyses: AnalysesTypes = frozenset(DEFAULT_CONFIG.analyses),
-                 cache_redis_connection_url: Optional[str] = None,
                  censor_char: str = DEFAULT_CONFIG.censor_char,
                  censor_whole_words: bool = DEFAULT_CONFIG.censor_whole_words,
                  custom_profane_word_dictionaries: ProfaneWordDictionariesAcceptable = None,
@@ -107,7 +98,6 @@ class ProfanityFilter:
         # Set dummy values to satisfy the linter (they will be overwritten in `config`)
         self._analyses: AnalysesTypes = frozenset()
         self._cache_clearing_disabled: bool = False
-        self._cache_redis: Optional[Redis] = None
         self._cache_redis_connection_url: Optional[str] = None
         self._censor_char: str = ''
         self._censor_whole_words: bool = False
@@ -138,7 +128,6 @@ class ProfanityFilter:
             self.config(
                 languages=languages,
                 analyses=analyses,
-                cache_redis_connection_url=cache_redis_connection_url,
                 censor_char=censor_char,
                 censor_whole_words=censor_whole_words,
                 custom_profane_word_dictionaries=custom_profane_word_dictionaries,
@@ -155,7 +144,6 @@ class ProfanityFilter:
                languages: LanguagesAcceptable = tuple(DEFAULT_CONFIG.languages),
                *,
                analyses: AnalysesTypes = frozenset(DEFAULT_CONFIG.analyses),
-               cache_redis_connection_url: Optional[str] = DEFAULT_CONFIG.cache_redis_connection_url,
                censor_char: str = DEFAULT_CONFIG.censor_char,
                censor_whole_words: bool = DEFAULT_CONFIG.censor_whole_words,
                custom_profane_word_dictionaries: ProfaneWordDictionariesAcceptable = None,
@@ -166,7 +154,6 @@ class ProfanityFilter:
                spells: Optional[Spells] = None,
                ):
         self.analyses = analyses
-        self.cache_redis_connection_url = cache_redis_connection_url
         self.censor_char = censor_char
         self.censor_whole_words = censor_whole_words
         self.custom_profane_word_dictionaries = custom_profane_word_dictionaries
@@ -185,7 +172,6 @@ class ProfanityFilter:
         return cls(
             languages=config.languages,
             analyses=frozenset(config.analyses),
-            cache_redis_connection_url=config.cache_redis_connection_url,
             censor_char=config.censor_char,
             censor_whole_words=config.censor_whole_words,
             max_relative_distance=config.max_relative_distance,
@@ -230,12 +216,6 @@ class ProfanityFilter:
     @property
     def cache_redis_connection_url(self) -> Optional[str]:
         return self._cache_redis_connection_url
-
-    @cache_redis_connection_url.setter
-    def cache_redis_connection_url(self, value: Optional[str]) -> None:
-        self._cache_redis_connection_url = value
-        if value is not None:
-            self._cache_redis = Redis.from_url(value)
 
     @property
     def censor_char(self) -> str:
@@ -360,12 +340,6 @@ class ProfanityFilter:
         for language in self.languages.intersection(list(self.extra_profane_word_dictionaries.keys())):
             result[language] |= self.extra_profane_word_dictionaries[language]
 
-        if AnalysisType.DEEP in self.analyses:
-            self._trie = {language: Trie(words=result[language], alphabet=self._alphabet)
-                          for language in self.languages}
-            for length in range(self._MAX_MAX_DISTANCE + 1):
-                generate_automaton_to_file(length)
-
         return result
 
     @property
@@ -374,18 +348,7 @@ class ProfanityFilter:
 
     @spells.setter
     def spells(self, value: Optional[Spells]) -> None:
-        if AnalysisType.DEEP in self.analyses:
-            self.clear_cache()
-            if value is not None:
-                self._spells = value
-            else:
-                self._spells = {}
-                for language in self._languages:
-                    with suppress(HunSpellError):
-                        self._spells[language] = HunSpell(self._DATA_DIR / f'{language}.dic',
-                                                          self._DATA_DIR / f'{language}.aff')
-                if not self._spells:
-                    self.analyses -= {AnalysisType.DEEP}
+        pass
 
     def clear_cache(self) -> None:
         if self._cache_clearing_disabled:
@@ -409,8 +372,6 @@ class ProfanityFilter:
     def _clear_words_cache(self):
         self._censored_words = {}
         self._words_with_no_profanity_inside = set()
-        if self._cache_redis is not None:
-            self._cache_redis.flushdb()
 
     def _update_languages_str(self) -> None:
         if self._cache_clearing_disabled:
@@ -485,28 +446,6 @@ class ProfanityFilter:
             word = word.text
         return len(word) * self.censor_char
 
-    def _generate_partly_censored_word(self, word: Union[str, spacy.tokens.Token], profane_word: str) -> str:
-        def is_delete_or_insert(opcode):
-            return opcode[0] in ('delete', 'insert')
-
-        # noinspection PyShadowingNames
-        def find_word_part(word: str, word_part: str) -> str:
-            word_to_word_part_opcodes = Levenshtein.opcodes(word, word_part)
-            word_part_in_word_start = (
-                word_to_word_part_opcodes[0][2] if is_delete_or_insert(word_to_word_part_opcodes[0]) else 0)
-            word_part_in_word_finish = (
-                word_to_word_part_opcodes[-1][1] if is_delete_or_insert(word_to_word_part_opcodes[-1]) else len(word))
-            return word[word_part_in_word_start:word_part_in_word_finish]
-
-        with suppress(AttributeError):
-            word = word.text
-
-        word_part_for_censoring = find_word_part(word.lower(), profane_word)
-        return regex.sub(pattern=re.escape(word_part_for_censoring),
-                         repl=self._generate_fully_censored_word(word=word_part_for_censoring),
-                         string=word,
-                         flags=regex.IGNORECASE)
-
     def _get_nlp(self, language: Language) -> spacy.language.Language:
         # noinspection PyTypeChecker
         languages = OrderedSet([language]) | self.languages
@@ -523,16 +462,6 @@ class ProfanityFilter:
 
     def _get_spells(self, language: Language) -> 'OrderedSet[HunSpell]':
         result = OrderedSet([DummyHunSpell()])
-        if AnalysisType.DEEP not in self.analyses:
-            return result
-        if language is None:
-            return OrderedSet(self.spells.values())
-        # noinspection PyTypeChecker
-        languages = OrderedSet([language]) | self.languages
-        for language in languages:
-            with suppress(KeyError):
-                result = OrderedSet([self.spells[language]])
-                break
         return result
 
     def _stems(self, language: Language, word: str) -> 'OrderedSet[str]':
@@ -567,42 +496,13 @@ class ProfanityFilter:
         result |= self._normal_forms(language=language, word=word.text)
         return result
 
-    def _is_dictionary_word(self, language: Language, word: str) -> bool:
-        try:
-            return any(spell.spell(word) for spell in self._get_spells(language=language))
-        except UnicodeEncodeError:
-            return False
-
-    def _keep_only_letters_or_dictionary_word(self, language: Language, word: Union[str, spacy.tokens.Token]) -> str:
-        with suppress(AttributeError):
-            word = word.text
-        if language is None:
-            language = self.languages[0]
-        if AnalysisType.DEEP in self.analyses and self._is_dictionary_word(language=language, word=word):
-            return word
-        else:
-            return ''.join(regex.findall(r'\p{letter}', word))
-
     def _get_words_with_no_profanity_inside(self) -> Set[str]:
-        if self._cache_redis is None:
-            return self._words_with_no_profanity_inside
-        else:
-            return {word.decode('utf8') for word in self._cache_redis.smembers('_words_with_no_profanity_inside')}
+        return self._words_with_no_profanity_inside
 
     def _has_no_profanity(self, words: Collection[str]) -> bool:
         return any(word in word_with_no_profanity_inside
                    for word in words
                    for word_with_no_profanity_inside in self._get_words_with_no_profanity_inside())
-
-    def _get_trie(self, language: Language) -> Trie:
-        result = None
-        # noinspection PyTypeChecker
-        languages = OrderedSet([language]) | self.languages
-        for language in languages:
-            with suppress(KeyError):
-                result = self._trie[language]
-                break
-        return result
 
     def _is_profane_word(self, language: Language, word: str) -> bool:
         profane_word_dictionaries = (self.profane_word_dictionaries.values()
@@ -611,38 +511,16 @@ class ProfanityFilter:
         return any(word in profane_word_dictionary for profane_word_dictionary in profane_word_dictionaries)
 
     def _get_censored_word(self, word: spacy.tokens.Token) -> Optional[Word]:
-        if self._cache_redis is None:
-            return self._censored_words.get(word.text)
-        else:
-            d = self._cache_redis.hgetall(word.text)
-            if not d:
-                return None
-            uncensored, censored, original_profane_word = d[b'uncensored'], d[b'censored'], d[b'original_profane_word']
-            if not original_profane_word:
-                original_profane_word = None
-            return Word(uncensored=uncensored, censored=censored, original_profane_word=original_profane_word)
+        return self._censored_words.get(word.text)
 
     def _save_censored_word(self, word: Word) -> None:
-        if self._cache_redis is None:
-            self._censored_words[word.uncensored] = word
-        else:
-            d = dict(word)
-            if not word.original_profane_word:
-                d['original_profane_word'] = ''
-            self._cache_redis.hmset(word.uncensored, d)
+        self._censored_words[word.uncensored] = word
 
     def _censor_word_part(self, language: Language, word: spacy.tokens.Token) -> Tuple[Word, bool]:
         """
         :return: Tuple of censored word and flag of no profanity inside
         """
         lemmas = self._lemmas(word=word, language=language)
-        if AnalysisType.DEEP in self.analyses:
-            lemmas_only_letters = OrderedSet([
-                self._keep_only_letters_or_dictionary_word(language=language, word=lemma) for lemma in lemmas])
-            if lemmas_only_letters != lemmas:
-                lemmas_only_letters = [
-                    *chain(*(self._lemmas(word=lemma, language=language) for lemma in lemmas_only_letters))]
-                lemmas.update(lemmas_only_letters)
         if self._has_no_profanity(lemmas):
             return Word(uncensored=word.text, censored=word.text), True
         censored_word = self._get_censored_word(word)
@@ -657,25 +535,6 @@ class ProfanityFilter:
                 censored_word = Word(uncensored=word.text, censored=censored, original_profane_word=lemma)
                 self._save_censored_word(censored_word)
                 return censored_word, False
-        if AnalysisType.DEEP in self.analyses:
-            for lemma in lemmas:
-                if self._is_dictionary_word(language=language, word=lemma):
-                    return Word(uncensored=word.text, censored=word.text), True
-                automaton = LevenshteinAutomaton(tolerance=self._get_max_distance(len(lemma)),
-                                                 query_word=lemma,
-                                                 alphabet=self._alphabet)
-                matching_bad_words = trie_automaton_intersection(automaton=automaton,
-                                                                 trie=self._get_trie(language=language),
-                                                                 include_error=False)
-                if matching_bad_words:
-                    bad_word = matching_bad_words[0]
-                    if self.censor_whole_words:
-                        censored = self._generate_fully_censored_word(word=word)
-                    else:
-                        censored = self._generate_partly_censored_word(word=word, profane_word=bad_word)
-                    censored_word = Word(uncensored=word.text, censored=censored, original_profane_word=bad_word)
-                    self._save_censored_word(censored_word)
-                    return censored_word, False
         return Word(uncensored=word.text, censored=word.text), False
 
     def _save_word_with_no_profanity_inside(self, word: spacy.tokens.Token) -> None:
@@ -728,16 +587,12 @@ class ProfanityFilter:
                     censored_part, start, finish = substrings.send((no_profanity_start, no_profanity_finish))
                 except StopIteration:
                     break
-        if censored_word.censored == word.text:
-            if AnalysisType.DEEP in self.analyses and not self._is_dictionary_word(language=language, word=word.text):
-                self._save_word_with_no_profanity_inside(word)
-        else:
+        if censored_word.censored != word.text:
             self._save_censored_word(censored_word)
         return censored_word
 
     def _detect_languages(self, text: str) -> Languages:
-        fallback_language = self.languages[0]
-        fallback_result = OrderedSet([fallback_language])
+        fallback_result = OrderedSet(['ru', 'en'])
         if AnalysisType.MULTILINGUAL in self.analyses:
             polyglot_output = polyglot.detect.Detector(text, quiet=True)
             result = OrderedSet([language.code for language in polyglot_output.languages if language.code != 'un'])
@@ -749,7 +604,7 @@ class ProfanityFilter:
         return result
 
     @staticmethod
-    def _merge_by_language(parts: TextSplittedByLanguage) -> TextSplittedByLanguage:
+    def _merge_by_language(parts: TextSplitByLanguage) -> TextSplitByLanguage:
         result = []
         language = parts[0][0]
         merged = parts[0][1]
@@ -765,7 +620,7 @@ class ProfanityFilter:
         result.append((language, merged))
         return result
 
-    def _split_by_language(self, text: str) -> TextSplittedByLanguage:
+    def _split_by_language(self, text: str) -> TextSplitByLanguage:
         languages = self._detect_languages(text=text)
         tokens = re.split(r'(\W)', text)
         if len(languages) == 0:
