@@ -21,6 +21,9 @@ class RouteGuideServicer(service_pb2_grpc.ProfanityFilterServicer):
         response = self.prof_filter.censor_text(request.text)
         return service_pb2.Text(text=response)
 
+    def Ping(self, request, context):
+        return service_pb2.Nothing()
+
     def serve(self, addr: str):
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         service_pb2_grpc.add_ProfanityFilterServicer_to_server(self, server)

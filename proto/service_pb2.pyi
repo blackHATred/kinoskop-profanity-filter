@@ -9,3 +9,7 @@ class Text(_message.Message):
     TEXT_FIELD_NUMBER: _ClassVar[int]
     text: str
     def __init__(self, text: _Optional[str] = ...) -> None: ...
+
+class Nothing(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...

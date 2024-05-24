@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from . import service_pb2 as service__pb2
+import service_pb2 as service__pb2
 
 GRPC_GENERATED_VERSION = '1.63.0'
 GRPC_VERSION = grpc.__version__
@@ -44,12 +44,23 @@ class ProfanityFilterStub(object):
                 request_serializer=service__pb2.Text.SerializeToString,
                 response_deserializer=service__pb2.Text.FromString,
                 _registered_method=True)
+        self.Ping = channel.unary_unary(
+                '/ProfanityFilter/Ping',
+                request_serializer=service__pb2.Nothing.SerializeToString,
+                response_deserializer=service__pb2.Nothing.FromString,
+                _registered_method=True)
 
 
 class ProfanityFilterServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def FilterMessage(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Ping(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -62,6 +73,11 @@ def add_ProfanityFilterServicer_to_server(servicer, server):
                     servicer.FilterMessage,
                     request_deserializer=service__pb2.Text.FromString,
                     response_serializer=service__pb2.Text.SerializeToString,
+            ),
+            'Ping': grpc.unary_unary_rpc_method_handler(
+                    servicer.Ping,
+                    request_deserializer=service__pb2.Nothing.FromString,
+                    response_serializer=service__pb2.Nothing.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -90,6 +106,33 @@ class ProfanityFilter(object):
             '/ProfanityFilter/FilterMessage',
             service__pb2.Text.SerializeToString,
             service__pb2.Text.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Ping(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ProfanityFilter/Ping',
+            service__pb2.Nothing.SerializeToString,
+            service__pb2.Nothing.FromString,
             options,
             channel_credentials,
             insecure,

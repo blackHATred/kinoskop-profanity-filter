@@ -4,6 +4,9 @@ message Text {
     string text = 1;
 }
 
+message Nothing {}
+
 service ProfanityFilter {
     rpc FilterMessage(Text) returns (Text) {}
+    rpc Ping(Nothing) returns (Nothing) {}
 }
