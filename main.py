@@ -49,5 +49,4 @@ if __name__ == "__main__":
 
     service = RouteGuideServicer()
     service.serve(args.addr)
-    censor = Censor()
 

@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package profanity;
+
 message Text {
     string text = 1;
 }

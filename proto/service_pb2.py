@@ -14,17 +14,17 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rservice.proto\"\x14\n\x04Text\x12\x0c\n\x04text\x18\x01 \x01(\t\"\t\n\x07Nothing2P\n\x0fProfanityFilter\x12\x1f\n\rFilterMessage\x12\x05.Text\x1a\x05.Text\"\x00\x12\x1c\n\x04Ping\x12\x08.Nothing\x1a\x08.Nothing\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rservice.proto\x12\tprofanity\"\x14\n\x04Text\x12\x0c\n\x04text\x18\x01 \x01(\t\"\t\n\x07Nothing2x\n\x0fProfanityFilter\x12\x33\n\rFilterMessage\x12\x0f.profanity.Text\x1a\x0f.profanity.Text\"\x00\x12\x30\n\x04Ping\x12\x12.profanity.Nothing\x1a\x12.profanity.Nothing\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'service_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_TEXT']._serialized_start=17
-  _globals['_TEXT']._serialized_end=37
-  _globals['_NOTHING']._serialized_start=39
-  _globals['_NOTHING']._serialized_end=48
-  _globals['_PROFANITYFILTER']._serialized_start=50
-  _globals['_PROFANITYFILTER']._serialized_end=130
+  _globals['_TEXT']._serialized_start=28
+  _globals['_TEXT']._serialized_end=48
+  _globals['_NOTHING']._serialized_start=50
+  _globals['_NOTHING']._serialized_end=59
+  _globals['_PROFANITYFILTER']._serialized_start=61
+  _globals['_PROFANITYFILTER']._serialized_end=181
 # @@protoc_insertion_point(module_scope)

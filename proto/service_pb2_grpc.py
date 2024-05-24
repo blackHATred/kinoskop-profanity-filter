@@ -40,12 +40,12 @@ class ProfanityFilterStub(object):
             channel: A grpc.Channel.
         """
         self.FilterMessage = channel.unary_unary(
-                '/ProfanityFilter/FilterMessage',
+                '/profanity.ProfanityFilter/FilterMessage',
                 request_serializer=service__pb2.Text.SerializeToString,
                 response_deserializer=service__pb2.Text.FromString,
                 _registered_method=True)
         self.Ping = channel.unary_unary(
-                '/ProfanityFilter/Ping',
+                '/profanity.ProfanityFilter/Ping',
                 request_serializer=service__pb2.Nothing.SerializeToString,
                 response_deserializer=service__pb2.Nothing.FromString,
                 _registered_method=True)
@@ -81,7 +81,7 @@ def add_ProfanityFilterServicer_to_server(servicer, server):
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'ProfanityFilter', rpc_method_handlers)
+            'profanity.ProfanityFilter', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
@@ -103,7 +103,7 @@ class ProfanityFilter(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/ProfanityFilter/FilterMessage',
+            '/profanity.ProfanityFilter/FilterMessage',
             service__pb2.Text.SerializeToString,
             service__pb2.Text.FromString,
             options,
@@ -130,7 +130,7 @@ class ProfanityFilter(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/ProfanityFilter/Ping',
+            '/profanity.ProfanityFilter/Ping',
             service__pb2.Nothing.SerializeToString,
             service__pb2.Nothing.FromString,
             options,
