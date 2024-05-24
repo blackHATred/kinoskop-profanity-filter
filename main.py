@@ -2,7 +2,6 @@ import argparse
 from concurrent import futures
 
 import grpc
-import spacy
 
 from profanity_filter import ProfanityFilter
 from profanity_filter import AVAILABLE_ANALYSES

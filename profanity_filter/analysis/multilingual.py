@@ -1,1 +1,1 @@
-import polyglot.detect
+import lingua

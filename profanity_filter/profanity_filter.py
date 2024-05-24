@@ -2,6 +2,8 @@ import re
 from collections import defaultdict
 from contextlib import suppress, contextmanager
 from copy import deepcopy
+
+import lingua
 from math import floor
 from pathlib import Path
 from typing import Dict, Union, List, Tuple, Set, Collection, ContextManager, Optional
@@ -123,6 +125,9 @@ class ProfanityFilter:
 
         # What to be censored - should not be modified by user
         self._censor_dictionaries: ProfaneWordDictionaries = {}
+
+        self.detector = lingua.LanguageDetectorBuilder.from_languages(
+            lingua.Language.RUSSIAN, lingua.Language.ENGLISH).build()
 
         with self._disabled_cache_clearing():
             self.config(
@@ -594,10 +599,8 @@ class ProfanityFilter:
     def _detect_languages(self, text: str) -> Languages:
         fallback_result = OrderedSet(['ru', 'en'])
         if AnalysisType.MULTILINGUAL in self.analyses:
-            polyglot_output = polyglot.detect.Detector(text, quiet=True)
-            result = OrderedSet([language.code for language in polyglot_output.languages if language.code != 'un'])
-            if not result:
-                result = fallback_result
+            result = OrderedSet(['ru' if self.detector.detect_language_of(word).name == 'RUSSIAN' else 'en' for word in text.split()])
+            print(result)
         else:
             result = fallback_result
         result = result.intersection(self.languages)
