@@ -1,4 +1,6 @@
 import argparse
+import re
+import string
 from concurrent import futures
 
 import grpc
@@ -36,9 +38,37 @@ class RouteGuideServicer(service_pb2_grpc.ProfanityFilterServicer):
 class Censor:
     def __init__(self):
         self.prof_filter = ProfanityFilter(languages=["en", "ru"])
+        with open('profanity_filter/data/regex.txt', 'r') as f:
+            self.regexes = [
+                re.compile(line.strip()) for line in f
+            ]
+        with open('profanity_filter/data/regex_white.txt', 'r') as f:
+            self.white_list_regexes = [
+                re.compile(r'\b' + line.strip() + r'\b') for line in f
+            ]
 
     def censor_text(self, text: str):
-        return self.prof_filter.censor(text)
+        # цензурим в два этапа - сначала морфологический анализ с нейронкой, потом регулярками
+        censored = self.prof_filter.censor(text.strip())
+        tokens = censored.split()
+
+        for i, token in enumerate(tokens):
+            if any(regex.search(token.lower()) for regex in self.white_list_regexes):
+                continue
+            for regex in self.regexes:
+                if regex.search(token.lower()):
+                    print(token)
+                    tokens[i] = re.sub(regex, lambda m: '*' * len(m.group(0)), token.lower())
+
+        return ' '.join(tokens)
+
+    def censor_token(self, token):
+        if any(regex.search(token) for regex in self.white_list_regexes):
+            return token
+        for regex in self.regexes:
+            if regex.search(token):
+                return re.sub(regex, lambda m: m.group(1) + '*' * len(m.group(2)) + m.group(3), token)
+        return token
 
 
 if __name__ == "__main__":
@@ -47,6 +77,11 @@ if __name__ == "__main__":
                         help='На каком адресе будет работать grpc сервер')
     args = parser.parse_args()
 
-    service = RouteGuideServicer()
-    service.serve(args.addr)
+    while True:
+        try:
+            service = RouteGuideServicer()
+            service.serve(args.addr)
+        except Exception as e:
+            print(f"Произошла ошибка: {e}")
+            continue
 

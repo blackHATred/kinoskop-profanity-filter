@@ -599,8 +599,13 @@ class ProfanityFilter:
     def _detect_languages(self, text: str) -> Languages:
         fallback_result = OrderedSet(['ru', 'en'])
         if AnalysisType.MULTILINGUAL in self.analyses:
-            result = OrderedSet(['ru' if self.detector.detect_language_of(word).name == 'RUSSIAN' else 'en' for word in text.split()])
-            print(result)
+            result = OrderedSet()
+            for word in text.split():
+                detected = self.detector.detect_language_of(word)
+                if detected is not None and detected.name == 'RUSSIAN':
+                    result.add('ru')
+                else:
+                    result.add('en')
         else:
             result = fallback_result
         result = result.intersection(self.languages)
